@@ -30,14 +30,16 @@ def on_key_press(key):
         except AttributeError:
             button = str(key)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestampMS = time.time()
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute('''
                         CREATE TABLE IF NOT EXISTS messages (
                             timestamp TEXT,
+                            timestampMS Int,
                             message TEXT
                         )
                     ''')
-            conn.execute('INSERT INTO messages (timestamp, message) VALUES (?, ?)', (timestamp, button))
+            conn.execute('INSERT INTO messages (timestamp, timestampMS, message) VALUES (?, ?, ?)', (timestamp, timestampMS, button))
             conn.commit()
 
 # Function to log mouse clicks with the time and button
