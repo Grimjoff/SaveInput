@@ -51,12 +51,10 @@ def on_key_release(key):
             release_time = time.perf_counter()
             for event in reversed(event_queue):
                 if (event["key"] == button or event["key"] == button.upper()) and event["release_time"] is None:
-                    print(event['key'] == button)
                     event["release_time"] = release_time
                     break
             while event_queue and event_queue[0]["release_time"] is not None:
                 e = event_queue.popleft()
-                print('push ', e)
                 with sqlite3.connect(DB_PATH) as conn:
                     conn.execute('''
                             INSERT INTO messages (press_time, release_time, message)
@@ -65,7 +63,6 @@ def on_key_release(key):
         except:
             pass
 
-import threading
 
 def cleanup_stuck_keys():
     while True:
@@ -73,13 +70,11 @@ def cleanup_stuck_keys():
         now = time.perf_counter()
         for event in list(event_queue):  # shallow copy to avoid modification during iteration
             if event["release_time"] is None and (now - event["press_time"]) > 10:  # 10 sec stuck?
-                print(f"Forcing release for key: {event['key']}")
                 event["release_time"] = 0  # short fallback duration
 
         # Flush any events that are now complete
         while event_queue and event_queue[0]["release_time"] is not None:
             e = event_queue.popleft()
-            print("pushing: ", e)
             with sqlite3.connect(DB_PATH) as conn:
                 conn.execute('''
                     INSERT INTO messages (press_time, release_time, message)
@@ -117,4 +112,3 @@ keyboard_listener.join()
 
 conn = sqlite3.connect('Database.db')
 cursor = conn.cursor()
-
