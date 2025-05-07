@@ -10,7 +10,7 @@ import sqlite3
 
 key_press_times = {}
 stop_event = threading.Event()
-DB_PATH = "Database.db"
+DB_PATH = "data/Database.db"
 count = 0
 event_queue = deque()
 
@@ -110,5 +110,5 @@ keyboard_listener.start()
 keyboard_listener.join()
 # mouse_listener.join()
 
-conn = sqlite3.connect('Database.db')
+conn = sqlite3.connect('data/Database.db')
 cursor = conn.cursor()
