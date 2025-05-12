@@ -1,0 +1,36 @@
+# Ignore SQLite amalgamation files (if you're not modifying them)
+sqlite3.c
+sqlite3.h
+
+# CLion specific files and folders
+.idea/
+*.iml
+cmake-build-*/
+
+# CMake build files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+
+# OS-specific files
+.DS_Store      # macOS
+Thumbs.db      # Windows
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Executables and compiled objects
+*.exe
+*.out
+*.o
+*.obj
+*.dll
+*.lib
+*.a
+
+# Debug or Release folders (build outputs)
+/debug/
+*/debug/
+*/release/
