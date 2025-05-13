@@ -1,4 +1,5 @@
 # Unique Fingerprint
+Educational purposes only, doing this for my private research without any evil intent.
 This little projects goal is to create a sort of "unique Fingerprint"
 for every user. This is done by tracking your keyboard inputs (Currently just in the discord application)
 and saving them with a timestamp for when it was pressed and when it was released.
