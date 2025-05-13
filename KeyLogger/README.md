@@ -8,3 +8,5 @@ The XGBoost tries to predict who wrote a specific message by analyzing previous 
 Since its hard to get people to install something that at its Core is a Keylogger, we create fake profiles for now. Currently they aren't that good so 
 The Model struggles at predicting them right. The real user, which is currently only me, gets predicted very well, however that might be related to the model not seeing any pattern 
 in the models at all.
+Main started to be in python. However, due to needing real users to try this it was rewritten into C
+so that others could execute it without needing a python interpreter.
