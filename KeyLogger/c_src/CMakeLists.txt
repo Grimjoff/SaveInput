@@ -15,5 +15,9 @@ if(UNIX AND NOT APPLE)
 endif()
 
 if(WIN32)
+    # Mark as a GUI application (no console)
+    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+
+    # Link Windows libraries
     target_link_libraries(${PROJECT_NAME} user32 psapi)
 endif()
