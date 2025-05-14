@@ -29,6 +29,7 @@ Thumbs.db      # Windows
 *.dll
 *.lib
 *.a
+*.db
 
 # Debug or Release folders (build outputs)
 /debug/
