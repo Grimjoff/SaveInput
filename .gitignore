@@ -30,7 +30,7 @@ Thumbs.db      # Windows
 *.lib
 *.a
 *.db
-
+*.xml
 # Debug or Release folders (build outputs)
 /debug/
 */debug/
