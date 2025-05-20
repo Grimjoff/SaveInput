@@ -3,7 +3,8 @@ import pandas as pd
 import sqlite3
 import numpy as np
 
-def transform_df(df, output_db_path='data/transformed_outputPC.db', table_name='TransformedData'):
+
+def transform_df(df, output_db_path='../data/transformed_outputPCnew.db', table_name='TransformedData'):
     username = getpass.getuser()
     df = df.rename(columns={'message': 'Button'})
 
@@ -45,7 +46,7 @@ def transform_df(df, output_db_path='data/transformed_outputPC.db', table_name='
     backspace_df = pd.DataFrame(backspace_features)
 
     # Now apply filtering for only alpha keys
-    df = df[df['Button'].str.match(r'^[a-zA-Z0-9]$')]
+    df = df[df['Button'].str.match(r'^[a-zA-Z0-9 ]$')]
     df.drop(columns=['is_enter'], inplace=True)
     df = df[df['Button'].str.len() == 1]
 
@@ -74,13 +75,20 @@ def transform_df(df, output_db_path='data/transformed_outputPC.db', table_name='
     transformed_df = pd.DataFrame(feature_rows)
     transformed_df = transformed_df.merge(backspace_df, on='message_id', how='left')
 
+    message_texts = (
+        df.groupby('message_id')['Button']
+        .apply(lambda buttons: ''.join(buttons))
+        .reset_index(name='full_message')
+    )
+    message_texts['word_count'] = message_texts['full_message'].str.split().apply(len)
+    transformed_df = transformed_df.merge(message_texts[['message_id', 'word_count']], on='message_id', how='left')
     # Save to SQLite DB
     with sqlite3.connect(output_db_path) as conn:
         transformed_df.to_sql(table_name, sqlite3.connect(output_db_path), if_exists='replace', index=False)
 
     print(f"Transformed data saved to {output_db_path} (table: {table_name})")
 
-df = pd.read_sql("SELECT * FROM messages", sqlite3.connect("data/Database.db"))
+df = pd.read_sql("SELECT * FROM messages", sqlite3.connect("C:/Users/Ben/CLionProjects/SaveInput/KeyLogger/data/database.db"))
 df = df.rename(columns={'message': 'Button'})
 button_replacements = {
     "Key.space": " ",
